@@ -105,6 +105,12 @@ Please (do your best to) stick to [Google's C++ style guide](https://google.gith
 Note: regardless of the changes you make, your project must be buildable using
 cmake and make!
 
+## Implementation
+### Scene Perception
+The simulator provides sensor fusion data containing information about other cars on the same side of the ego vehicle's road. Looping through the sensor fusion data, I first extract the target vehicle's lane by looking at target's `d` value. [line 279-301] 
+Then I calculate the target's speed using the target's `x` and `y` velocity componenets. The simulator also provides the remaining path of the previous path provided to the simulator. Using the target's current position and speed, I predict the target's future position. Here the future referes to the end of the previous path. [line 304-310]
+Using the target's predicted postion, I check if the target could be within 30m, both front and behind, of ego vehicle. I also check in which lane the target is present. I keep track of the closest target's speed on either side of the ego lane, if plausible. This will help later in deciding on which lane to move to if the ego is in center lane and whats to change lanes. [line 314-359]
+
 
 ## Call for IDE Profiles Pull Requests
 
