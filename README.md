@@ -107,9 +107,27 @@ cmake and make!
 
 ## Implementation
 ### Scene Perception
-The simulator provides sensor fusion data containing information about other cars on the same side of the ego vehicle's road. Looping through the sensor fusion data, I first extract the target vehicle's lane by looking at target's `d` value. [line 279-301] 
+The simulator provides sensor fusion data containing information about other cars on the same side of the ego vehicle's road. Looping through the sensor fusion data, I first extract the target vehicle's lane by looking at target's `d` value. [line 279-301]
+
 Then I calculate the target's speed using the target's `x` and `y` velocity componenets. The simulator also provides the remaining path of the previous path provided to the simulator. Using the target's current position and speed, I predict the target's future position. Here the future referes to the end of the previous path. [line 304-310]
-Using the target's predicted postion, I check if the target could be within 30m, both front and behind, of ego vehicle. I also check in which lane the target is present. I keep track of the closest target's speed on either side of the ego lane, if plausible. This will help later in deciding on which lane to move to if the ego is in center lane and whats to change lanes. [line 314-359]
+
+Using the target's predicted postion, I check if the target could be within 30m, both front and behind, of ego vehicle. I also find the target's lane and keep track of the closest target's speed on either side of the ego vehicle's lane, if plausible. This will help later in deciding to which lane to move to if the ego is in center lane and has to change lanes. [line 314-359]
+
+### Behaviour Planning
+If all is good and if there is no vehicle in front of the ego vehicle then the ego vehicle will maintain the same lane and keep increasing its speed until it reaches close to the maximum speed limit of 50MPH. But if it is the case where there is a vehicle in front of the ego vehicle then I check if I can change to either left or right lane. If both lanes are clear, meaning there is no predicted target which could be within 30m of the ego vehicle, then the lane which has faster moving traffic is choosen. If only left lane is clear then the left lane is choosen and if only right lane is clear then the right lane is choosen. If either lane is not clear then the ego will maintain the current lane but will keep reducing its speed. [line 362-412]
+
+Please note that the ego vehicle will not move to left if it is already in the left most lane and it will not move to the right if it is already in the right most lane.
+
+### Prepare Path
+I create a list of widely spaced waypoints, evenly spaced at 30m. Later I will interpolate these waypoints with the spline and fill it with more points so as to control speed and for smoother path.
+
+Starting point of the waypoints will either be the ego vehicle's current and previous position or will be couple of end points of the previous path depending on the number of points available in the previous path. Adding the points from previous path will lead to smoother transition. I then add 3 more points spaced evenly at 30m in Frenet co-ordinate system. [line 422-475]
+
+The 5 points from the previous step are in global co-ordinate system. For easier mathematical calculations and for good behaviour of the spline function, I transform these points to local co-ordinate system where the ego vehicle will be at the origin with `x` as the horizontal axis. [line 484-492]
+
+A spline is created with the above 5 points. A total of 50 points is sent to the simulator as path planner points. If there are points available from the prevous path then they are first added to the current path planner points list. The remaining points are extracted from the spline function using `x` values in between ego vehicle's current position and 30m ahead in `x` direction. An example of the extraction is shown below 
+
+
 
 
 ## Call for IDE Profiles Pull Requests
