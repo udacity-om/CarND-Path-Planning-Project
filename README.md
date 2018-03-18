@@ -1,3 +1,7 @@
+[//]: # (Image References)
+
+[image1]: ./images/SDCN_Spline_Screenshot.jpg "Spline"
+
 # CarND-Path-Planning-Project
 Self-Driving Car Engineer Nanodegree Program
    
@@ -125,9 +129,9 @@ Starting point of the waypoints will either be the ego vehicle's current and pre
 
 The 5 points from the previous step are in global co-ordinate system. For easier mathematical calculations and for good behaviour of the spline function, I transform these points to local co-ordinate system where the ego vehicle will be at the origin with `x` as the horizontal axis. [line 484-492]
 
-A spline is created with the above 5 points. A total of 50 points is sent to the simulator as path planner points. If there are points available from the prevous path then they are first added to the current path planner points list. The remaining points are extracted from the spline function using `x` values in between ego vehicle's current position and 30m ahead in `x` direction. An example of the extraction is shown below 
+A spline is created with the above 5 points. A total of 50 points is sent to the simulator as path planner points. If there are points available from the prevous path then they are first added to the current path planner points list. The remaining points are extracted from the spline function using `x` values in between ego vehicle's current position and 30m ahead in `x` direction. An example of the extraction is shown below:
 
-
+![alt text][image1]
 
 
 ## Call for IDE Profiles Pull Requests
