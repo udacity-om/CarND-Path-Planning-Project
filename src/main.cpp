@@ -308,13 +308,11 @@ int main() {
                   
                /* predict the targets s value into the future. Future here is the last point of ego's previous path */
                target_s += ((double)prev_size*0.02*target_speed);
-               //std::cout << "Car S is " << car_s << std::endl;
-               //std::cout << "Target S is " << target_s << std::endl;               
+               /* std::cout << "Car S is " << car_s << std::endl; */
+               /* std::cout << "Target S is " << target_s << std::endl; */               
                
                int lane_diff = ego_lane - target_lane;
                float target_min_safe_dist = 30;
-               bool is_target_in_front = false;
-               bool is_target_behind = false;
                bool is_target_near_ego = false;
                
                /* check if the target could be within +- 30m of ego */
@@ -323,10 +321,8 @@ int main() {
                /* Check if the target is in the same lane */
                if(0 == lane_diff)
                {
-                  target_in_ego_lane |= (target_s > car_s) && (true == is_target_near_ego);
-                  
-                  /* std::cout << "Target is close in same lane" << std::endl; */ 
-                     
+                  target_in_ego_lane |= (target_s > car_s) && (true == is_target_near_ego);                  
+                  /* std::cout << "Target is close in same lane" << std::endl; */                      
                }
                /* Check if the target is in the right lane */
                else if(0 > lane_diff)
@@ -360,8 +356,7 @@ int main() {
                      /* std::cout << "Target is close in left lane" << std::endl; */                    
                   }
                }
-            }
-            
+            }            
                
             /* What to do if target is in front of ego */
             if(true == target_in_ego_lane)
@@ -485,7 +480,7 @@ int main() {
              * Transform from gobal co-ordinate to local car's local co-ordinate 
             \*******************************************************************************/
             /* Transform points to car's local co-ordinate which makes the math easier later.
-               Transformation also helps in a creating good spline as all teh values will be horizontal */            
+               Transformation also helps in a creating good spline as all the values will be horizontal */            
             for(int i=0; i < ptsx.size(); ++i)
             {
                /* shift car reference angle to 0 degrees */
@@ -500,7 +495,18 @@ int main() {
             /*******************************************************************************\
              * Add points from the spline to the actual path planner points set.
              * Getting points from spline ensures smooter path.
-            \*******************************************************************************/
+            \*******************************************************************************/                        
+            /* create a spline */
+            tk::spline s;
+            
+            /* set (x,y) points to the spline */
+            s.set_points(ptsx, ptsy); 
+            
+            /* Calculate how to break up spline points so that we travel at our desired reference velocity */
+            double target_x = 30.0;
+            double target_y = s(target_x);
+            double target_dist = sqrt((target_x*target_x) + (target_y*target_y));            
+            
             /* define the actual (x,y) points we will use for the planner */
           	vector<double> next_x_vals;
           	vector<double> next_y_vals;
@@ -511,17 +517,6 @@ int main() {
                next_x_vals.push_back(previous_path_x[i]);
                next_y_vals.push_back(previous_path_y[i]);
             }
-                        
-            /* create a spline */
-            tk::spline s;
-            
-            /* set (x,y) points to the spline */
-            s.set_points(ptsx, ptsy); 
-            
-            /* Calculate how to break up spline points so that we travel at our desired reference velocity */
-            double target_x = 30.0;
-            double target_y = s(target_x);
-            double target_dist = sqrt((target_x*target_x) + (target_y*target_y));
             
             /* The value is 0 which follows from the local transforation we did earlier, i.e. to start at origin */
             double x_add_on = 0;
@@ -549,9 +544,7 @@ int main() {
                next_x_vals.push_back(x_point);
                next_y_vals.push_back(y_point);               
             }
-            /*******************************************************************************/ 
-
-          	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds            
+            /*******************************************************************************/        
 
           	json msgJson;
             
