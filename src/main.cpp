@@ -19,6 +19,8 @@ using json = nlohmann::json;
 constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
 double rad2deg(double x) { return x * 180 / pi(); }
+// The max s value before wrapping around the track back to 0
+double max_s = 6945.554;
 
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
@@ -176,8 +178,6 @@ int main() {
 
   // Waypoint map to read from
   string map_file_ = "../data/highway_map.csv";
-  // The max s value before wrapping around the track back to 0
-  double max_s = 6945.554;
 
   ifstream in_map_(map_file_.c_str(), ifstream::in);
 
@@ -249,7 +249,7 @@ int main() {
             
             
             /* Sensor fusion gives us information about all the other cars on the road */
-            /* If there is some points in the previous path, then select the previous path's end s as current car's s so as get the ego's future location*/
+            /* If there is some points in the previous path, then select the previous path's end s as current car's s so as to get the ego's future location*/
             if(prev_size > 0)
             {
                car_s = end_path_s;
@@ -257,7 +257,14 @@ int main() {
             
             bool target_in_left_lane = false;
             bool target_in_ego_lane = false;
-            bool target_in_right_lane = false;           
+            bool target_in_right_lane = false;
+            float left_lane_closest_target_s = max_s;
+            float left_lane_closest_target_speed = 0.0;
+            float right_lane_closest_target_s = max_s;
+            float right_lane_closest_target_speed = 0.0;
+            bool is_left_lane_faster = false;
+            bool is_left_lane_clear = false;
+            bool is_right_lane_clear = false;
             
             /*******************************************************************************\
              * Select a reference velocity of ego
@@ -274,17 +281,17 @@ int main() {
                /* get the target's lane */
                if((target_d > 0) && (target_d < 4))
                {
-                  //std::cout << "Target in lane 0" << std::endl;
+                  /* std::cout << "Target in lane 0" << std::endl; */
                   target_lane = 0;
                }
                else if((target_d > 4) && (target_d < 8))
                {
-                  //std::cout << "Target in lane 1" << std::endl;
+                  /* std::cout << "Target in lane 1" << std::endl; */
                   target_lane = 1;                  
                }
                else if((target_d > 8) && (target_d < 12))
                {
-                  //std::cout << "Target in lane 2" << std::endl;
+                  /* std::cout << "Target in lane 2" << std::endl; */
                   target_lane = 2;                  
                }
                else
@@ -306,33 +313,51 @@ int main() {
                
                int lane_diff = ego_lane - target_lane;
                float target_min_safe_dist = 30;
+               bool is_target_in_front = false;
+               bool is_target_behind = false;
                bool is_target_near_ego = false;
                
                /* check if the target could be within +- 30m of ego */
                is_target_near_ego = (target_s > (car_s - target_min_safe_dist)) && (target_s < (car_s + target_min_safe_dist));
                
+               /* Check if the target is in the same lane */
                if(0 == lane_diff)
                {
-                  target_in_ego_lane |= (target_s > car_s) && (target_s < (car_s + target_min_safe_dist));
-                  if(target_in_left_lane)
-                  {
-                     //std::cout << "Target is close in same lane" << std::endl;                   
-                  }
+                  target_in_ego_lane |= (target_s > car_s) && (true == is_target_near_ego);
+                  
+                  /* std::cout << "Target is close in same lane" << std::endl; */ 
+                     
                }
+               /* Check if the target is in the right lane */
                else if(0 > lane_diff)
                {
                   target_in_right_lane |= is_target_near_ego;
+                  
                   if(target_in_right_lane)
                   {
-                     //std::cout << "Target is close in right lane" << std::endl;                     
+                     /* Store the closest target's distance and speed */
+                     if(target_s < left_lane_closest_target_s)
+                     {
+                        left_lane_closest_target_s = target_s;
+                        left_lane_closest_target_speed = target_speed;
+                     }
+                     /* std::cout << "Target is close in right lane" << std::endl; */                    
                   }
                }
+               /* Check if the target is in the left lane */
                else if(0 < lane_diff)
                {
                   target_in_left_lane |= is_target_near_ego;
+                  
                   if(target_in_left_lane)
                   {
-                     //std::cout << "Target is close in left lane" << std::endl;                     
+                     /* Store the closest target's distance and speed */
+                     if(target_s < right_lane_closest_target_s)
+                     {
+                        right_lane_closest_target_s = target_s;
+                        right_lane_closest_target_speed = target_speed;
+                     }
+                     /* std::cout << "Target is close in left lane" << std::endl; */                    
                   }
                }
             }
@@ -340,20 +365,38 @@ int main() {
                
             /* What to do if target is in front of ego */
             if(true == target_in_ego_lane)
-            {       
-               #if 0
-               if(ref_vel > 0.224)
+            {
+               if(left_lane_closest_target_speed > right_lane_closest_target_speed)
                {
-                  ref_vel -= 0.224;                        
+                  is_left_lane_faster = true;
                }
-               #else
-               /* try to go left */
-               if((ego_lane > 0) && (false == target_in_left_lane))
+               
+               /* check if the ego is not in left most lane and left lane is clear */
+               is_left_lane_clear = (ego_lane > 0) && (false == target_in_left_lane);
+               /* check if the ego is not in right most lane and right lane is clear */
+               is_right_lane_clear = (2 != ego_lane) && (false == target_in_right_lane);
+               
+               /* If both left and right lanes are clear then choose the faster lane */
+               if(is_left_lane_clear && is_right_lane_clear)
+               {
+                  if(true == is_left_lane_faster)
+                  {
+                     ego_lane--;                   
+                     /* std::cout << "Left lane is faster" << std::endl; */
+                  }
+                  else
+                  {
+                     ego_lane++;             
+                     /* std::cout << "Right lane is faster" << std::endl; */         
+                  }
+               }               
+               /* try to go left if the ego is not in left most lane */
+               else if(is_left_lane_clear)
                {
                   ego_lane--;
                }
-               /* try to go right */
-               else if((2 != ego_lane) && (false == target_in_right_lane))
+               /* try to go right if the ego is not in right most lane */
+               else if(is_right_lane_clear)
                {
                   ego_lane++;                     
                }
@@ -362,18 +405,15 @@ int main() {
                {
                   if(ref_vel > 0.224)
                   {
-                     ref_vel -= 0.224;                        
+                     ref_vel -= 0.224;          
+                     /* std::cout << "Reducing reference velocity " << ref_vel<< std::endl; */              
                   }
                }
-               #endif
             }
-            else if(ref_vel < 49.5)
-            {
-               ref_vel += 0.224;                   
-            }
+            /* If there is nothing in front of ego, then keep increasing the speed until it reaches the max */
             else
-            {
-               /* Do nothing */
+            { 
+               ref_vel += ((ref_vel < 49.5)?0.224:0.0);
             }
             
             //std::cout << "Reference velocity is " << ref_vel << std::endl; 
